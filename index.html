@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2048 Game</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #faf8ef;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 40px;
+    }
+    .game-container {
+      width: 460px;
+      margin: 0 auto;
+    }
+    .game-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .game-title {
+      font-size: 80px;
+      font-weight: bold;
+      color: #776e65;
+    }
+    .score-container {
+      background-color: #bbada0;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 5px;
+      text-align: center;
+    }
+    .score-label {
+      font-size: 14px;
+      color: #eee4da;
+    }
+    .score-value {
+      font-size: 28px;
+      font-weight: bold;
+    }
+    .game-board {
+      width: 460px;
+      height: 460px;
+      background-color: #bbada0;
+      border-radius: 10px;
+      padding: 15px;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+      gap: 15px;
+    }
+    .tile {
+      background-color: #cdc1b4;
+      border-radius: 5px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 40px;
+      font-weight: bold;
+      color: #776e65;
+    }
+    .tile-2 { background-color: #eee4da; }
+    .tile-4 { background-color: #ede0c8; }
+    .tile-8 { background-color: #f2b179; color: white; }
+    .tile-16 { background-color: #f59563; color: white; }
+    .tile-32 { background-color: #f67c5f; color: white; }
+    .tile-64 { background-color: #f65e3b; color: white; }
+    .tile-128 { background-color: #edcf72; color: white; font-size: 35px; }
+    .tile-256 { background-color: #edcc61; color: white; font-size: 35px; }
+    .tile-512 { background-color: #edc850; color: white; font-size: 35px; }
+    .tile-1024 { background-color: #edc53f; color: white; font-size: 30px; }
+    .tile-2048 { background-color: #edc22e; color: white; font-size: 30px; }
+    .tile-super { background-color: #3c3a32; color: white; font-size: 30px; }
+    .game-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(238, 228, 218, 0.73);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 100;
+    }
+    .game-over-text {
+      font-size: 60px;
+      font-weight: bold;
+      color: #776e65;
+      margin-bottom: 20px;
+    }
+    .restart-btn {
+      background-color: #8f7a66;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    .admin-menu {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 10px;
+      background: #f5f5f5;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      display: none;
+    }
+    .admin-menu button {
+      display: block;
+      margin: 5px 0;
+      padding: 8px 12px;
+      background: #4285f4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .admin-menu button:last-child {
+      background: #dc3545;
+    }
+    .logout-btn {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      padding: 8px 12px;
+      background: #dc3545;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <!-- 管理员菜单 -->
+  <div class="admin-menu" id="admin-menu">
+    <button onclick="viewAccessData()">查看访问数据</button>
+    <button onclick="viewLogs()">查看操作日志</button>
+  </div>
+  <!-- 退出登录按钮 -->
+  <button class="logout-btn" onclick="logout()">退出登录</button>
+  <!-- 游戏容器 -->
+  <div class="game-container">
+    <div class="game-header">
+      <div class="game-title">2048</div>
+      <div class="score-container">
+        <div class="score-label">SCORE</div>
+        <div class="score-value" id="score">0</div>
+      </div>
+    </div>
+    <div class="game-board" id="game-board"></div>
+  </div>
+  <!-- 游戏结束遮罩 -->
+  <div class="game-overlay" id="game-overlay">
+    <div class="game-over-text" id="game-over-text">Game Over!</div>
+    <button class="restart-btn" onclick="restartGame()">重新开始</button>
+  </div>
+
+  <script>
+    // 全局配置
+    const API_TIMEOUT = 10000; // 请求超时时间10秒
+    let board = [];
+    let score = 0;
+    let gameOver = false;
+    let userInfo = null;
+
+    // 页面加载时校验登录状态
+    window.onload = function() {
+      try {
+        const userInfoStr = localStorage.getItem('userInfo');
+        if (!userInfoStr) {
+          window.location.href = 'login.html';
+          return;
+        }
+        userInfo = JSON.parse(userInfoStr);
+        
+        // 管理员显示权限菜单
+        if (userInfo.role === 'admin') {
+          document.getElementById('admin-menu').style.display = 'block';
+        }
+        
+        // 初始化游戏
+        initGame();
+      } catch (error) {
+        console.error('页面加载失败：', error);
+        alert('登录状态异常，请重新登录');
+        localStorage.removeItem('userInfo');
+        window.location.href = 'login.html';
+      }
+    };
+
+    // 初始化游戏
+    function initGame() {
+      board = [
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0]
+      ];
+      score = 0;
+      gameOver = false;
+      document.getElementById('score').textContent = score;
+      document.getElementById('game-overlay').style.display = 'none';
+      
+      // 生成两个初始方块
+      generateRandomTile();
+      generateRandomTile();
+      updateBoard();
+    }
+
+    // 生成随机方块
+    function generateRandomTile() {
+      if (isBoardFull()) return;
+      
+      let row, col;
+      do {
+        row = Math.floor(Math.random() * 4);
+        col = Math.floor(Math.random() * 4);
+      } while (board[row][col] !== 0);
+      
+      board[row][col] = Math.random() < 0.9 ? 2 : 4;
+    }
+
+    // 检查棋盘是否满了
+    function isBoardFull() {
+      for (let row = 0; row < 4; row++) {
+        for (let col = 0; col < 4; col++) {
+          if (board[row][col] === 0) return false;
+        }
+      }
+      return true;
+    }
+
+    // 更新棋盘显示
+    function updateBoard() {
+      const gameBoard = document.getElementById('game-board');
+      gameBoard.innerHTML = '';
+      
+      for (let row = 0; row < 4; row++) {
+        for (let col = 0; col < 4; col++) {
+          const tile = document.createElement('div');
+          tile.classList.add('tile');
+          if (board[row][col] !== 0) {
+            tile.classList.add(`tile-${board[row][col]}`);
+            tile.textContent = board[row][col];
+          }
+          gameBoard.appendChild(tile);
+        }
+      }
+    }
+
+    // 移动方块
+    function move(direction) {
+      if (gameOver) return;
+      
+      let moved = false;
+      let newBoard = JSON.parse(JSON.stringify(board));
+      
+      switch (direction) {
+        case 'left':
+          for (let row = 0; row < 4; row++) {
+            let newRow = newBoard[row].filter(num => num !== 0);
+            for (let i = 0; i < newRow.length - 1; i++) {
+              if (newRow[i] === newRow[i + 1]) {
+                newRow[i] *= 2;
+                score += newRow[i];
+                newRow.splice(i + 1, 1);
+                moved = true;
+              }
+            }
+            while (newRow.length < 4) newRow.push(0);
+            newBoard[row] = newRow;
+            if (JSON.stringify(newBoard[row]) !== JSON.stringify(board[row])) moved = true;
+          }
+          break;
+          
+        case 'right':
+          for (let row = 0; row < 4; row++) {
+            let newRow = newBoard[row].filter(num => num !== 0);
+            for (let i = newRow.length - 1; i > 0; i--) {
+              if (newRow[i] === newRow[i - 1]) {
+                newRow[i] *= 2;
+                score += newRow[i];
+                newRow.splice(i - 1, 1);
+                moved = true;
+              }
+            }
+            while (newRow.length < 4) newRow.unshift(0);
+            newBoard[row] = newRow;
+            if (JSON.stringify(newBoard[row]) !== JSON.stringify(board[row])) moved = true;
+          }
+          break;
+          
+        case 'up':
+          for (let col = 0; col < 4; col++) {
+            let newCol = [];
+            for (let row = 0; row < 4; row++) {
+              if (newBoard[row][col] !== 0) newCol.push(newBoard[row][col]);
+            }
+            for (let i = 0; i < newCol.length - 1; i++) {
+              if (newCol[i] === newCol[i + 1]) {
+                newCol[i] *= 2;
+                score += newCol[i];
+                newCol.splice(i + 1, 1);
+                moved = true;
+              }
+            }
+            while (newCol.length < 4) newCol.push(0);
+            for (let row = 0; row < 4; row++) {
+              newBoard[row][col] = newCol[row];
+            }
+            if (JSON.stringify(newCol) !== JSON.stringify(board.map(row => row[col]))) moved = true;
+          }
+          break;
+          
+        case 'down':
+          for (let col = 0; col < 4; col++) {
+            let newCol = [];
+            for (let row = 0; row < 4; row++) {
+              if (newBoard[row][col] !== 0) newCol.push(newBoard[row][col]);
+            }
+            for (let i = newCol.length - 1; i > 0; i--) {
+              if (newCol[i] === newCol[i - 1]) {
+                newCol[i] *= 2;
+                score += newCol[i];
+                newCol.splice(i - 1, 1);
+                moved = true;
+              }
+            }
+            while (newCol.length < 4) newCol.unshift(0);
+            for (let row = 0; row < 4; row++) {
+              newBoard[row][col] = newCol[row];
+            }
+            if (JSON.stringify(newCol) !== JSON.stringify(board.map(row => row[col]))) moved = true;
+          }
+          break;
+      }
+      
+      if (moved) {
+        board = newBoard;
+        document.getElementById('score').textContent = score;
+        generateRandomTile();
+        updateBoard();
+        
+        // 检查游戏是否结束
+        if (isGameOver()) {
+          gameOver = true;
+          document.getElementById('game-over-text').textContent = 'Game Over!';
+          document.getElementById('game-overlay').style.display = 'flex';
+        }
+      }
+    }
+
+    // 检查游戏是否结束
+    function isGameOver() {
+      if (!isBoardFull()) return false;
+      
+      // 检查是否有相邻的相同数字
+      for (let row = 0; row < 4; row++) {
+        for (let col = 0; col < 4; col++) {
+          // 检查右边
+          if (col < 3 && board[row][col] === board[row][col + 1]) return false;
+          // 检查下边
+          if (row < 3 && board[row][col] === board[row + 1][col]) return false;
+        }
+      }
+      return true;
+    }
+
+    // 重新开始游戏
+    function restartGame() {
+      initGame();
+    }
+
+    // 键盘控制
+    document.addEventListener('keydown', function(e) {
+      switch (e.key) {
+        case 'ArrowLeft': move('left'); break;
+        case 'ArrowRight': move('right'); break;
+        case 'ArrowUp': move('up'); break;
+        case 'ArrowDown': move('down'); break;
+      }
+    });
+
+    // 管理员：查看访问数据
+    async function viewAccessData() {
+      if (!userInfo) return;
+      
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+        
+        const response = await fetch(`/api/admin/access-data?username=${encodeURIComponent(userInfo.username)}`, {
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('用户访问数据：\n' + JSON.stringify(result.data, null, 2));
+        } else {
+          alert(result.message || '获取访问数据失败');
+        }
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          alert('请求超时，请检查网络');
+        } else {
+          alert('获取访问数据失败');
+          console.error(error);
+        }
+      }
+    }
+
+    // 管理员：查看操作日志
+    async function viewLogs() {
+      if (!userInfo) return;
+      
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+        
+        const response = await fetch(`/api/admin/logs?username=${encodeURIComponent(userInfo.username)}`, {
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('操作日志：\n' + JSON.stringify(result.data, null, 2));
+        } else {
+          alert(result.message || '获取日志失败');
+        }
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          alert('请求超时，请检查网络');
+        } else {
+          alert('获取日志失败');
+          console.error(error);
+        }
+      }
+    }
+
+    // 退出登录
+    function logout() {
+      localStorage.removeItem('userInfo');
+      window.location.href = 'login.html';
+    }
+  </script>
+</body>
+</html>

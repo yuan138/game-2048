@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  2048-game:
+    build: .
+    container_name: 2048-game
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    volumes:
+      - ./data.json:/app/data.json
+    environment:
+      - PORT=3000
+      - NODE_ENV=production

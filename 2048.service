@@ -1,0 +1,29 @@
+[Unit]
+Description=2048 Game Server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/2048-game
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=10
+Environment=NODE_ENV=production
+Environment=PORT=3000
+
+# 安全加固
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/www/2048-game
+
+# 日志
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=2048-game
+
+[Install]
+WantedBy=multi-user.target
